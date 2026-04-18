@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- SECURITY -->
+<!-- 🔐 SECURITY -->
 <meta http-equiv="Content-Security-Policy"
 content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
 
-<title>RPG PRO FINAL</title>
+<title>RPG PRO SECURE</title>
 
 <style>
 body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif}
@@ -32,7 +32,8 @@ display:none;max-height:300px;overflow:auto;width:90%;
 
 <div id="menu">
 <h2>RPG PRO</h2>
-<button onclick="start()">Start Game</button>
+<button onclick="start(false)">Player</button>
+<button onclick="start(true)">Dev</button>
 </div>
 
 <div id="game" style="display:none">
@@ -61,16 +62,14 @@ display:none;max-height:300px;overflow:auto;width:90%;
 <script>
 const ctx=c.getContext("2d")
 
+// 🔐 SAFE NUMBER
 function safe(n){return isNaN(n)?0:Math.max(0,n)}
-
-let move={x:0,y:0},kill=0,lastHit=0,multi=1,isNeutral=false
-
-let player={x:50,y:150,hp:100,maxHp:100,atk:5,gold:100}
-let enemy={x:250,y:150,hp:80,maxHp:80}
 
 // SAVE
 function save(){
-localStorage.setItem("save",JSON.stringify({gold:player.gold,kill:kill}))
+localStorage.setItem("save",JSON.stringify({
+gold:player.gold,kill:kill
+}))
 }
 function load(){
 try{
@@ -82,19 +81,11 @@ kill=safe(d.kill)
 }catch{}
 }
 
-// START
-function start(){
-menu.style.display="none"
-game.style.display="block"
-load()
-hold(l,-2,0);hold(r,2,0);hold(u,0,-2);hold(d,0,2)
-loop()
-}
+// GAME DATA
+let move={x:0,y:0},kill=0,lastHit=0,multi=1,isNeutral=false
 
-function hold(b,x,y){
-b.onmousedown=b.ontouchstart=()=>move={x,y}
-b.onmouseup=b.ontouchend=()=>move={x:0,y:0}
-}
+let player={x:50,y:150,hp:100,maxHp:100,atk:5,gold:100}
+let enemy={x:250,y:150,hp:80,maxHp:80}
 
 // WEAPON
 let weapons=[
@@ -110,21 +101,7 @@ let weapons=[
 {name:"Crystal Edge",p:14,price:79,owned:false,equip:false}
 ]
 
-// POTION
-let potions=[
-{name:"Tiny Heal",heal:11,price:5},
-{name:"Small Heal",heal:17,price:9},
-{name:"Mild Heal",heal:23,price:13},
-{name:"Fresh Heal",heal:29,price:17},
-{name:"Strong Heal",heal:37,price:23},
-{name:"Great Heal",heal:43,price:27},
-{name:"Mega Heal",heal:51,price:31},
-{name:"Ultra Heal",heal:59,price:37},
-{name:"Max Heal",heal:67,price:43},
-{name:"Legend Heal",heal:79,price:53}
-]
-
-// MORPH
+// MORPH (20)
 let morphBaik=[
 {name:"Light Guardian",need:3,m:2},{name:"Holy Knight",need:5,m:2},
 {name:"Divine Angel",need:7,m:3},{name:"Radiant Hero",need:9,m:4},
@@ -141,6 +118,23 @@ let morphNetral=[
 {name:"Perfect Balance",need:24,m:10},{name:"Absolute Core",need:28,m:100}
 ]
 
+// START
+function start(dev){
+menu.style.display="none"
+game.style.display="block"
+
+load()
+
+hold(l,-2,0);hold(r,2,0);hold(u,0,-2);hold(d,0,2)
+loop()
+}
+
+// CONTROL HOLD
+function hold(b,x,y){
+b.onmousedown=b.ontouchstart=()=>move={x,y}
+b.onmouseup=b.ontouchend=()=>move={x:0,y:0}
+}
+
 // DAMAGE
 function updateAtk(){
 player.atk=5
@@ -153,6 +147,7 @@ ctx.clearRect(0,0,320,220)
 
 player.x+=move.x
 player.y+=move.y
+
 player.x=Math.max(10,Math.min(player.x,290))
 player.y=Math.max(10,Math.min(player.y,180))
 
@@ -161,9 +156,11 @@ enemy.x+=(player.x-enemy.x)*0.02
 enemy.y+=(player.y-enemy.y)*0.02
 }
 
+// PLAYER
 ctx.fillStyle="cyan"
 ctx.fillRect(player.x,player.y,20,20)
 
+// ENEMY
 ctx.fillStyle="red"
 ctx.fillRect(enemy.x,enemy.y,20,20)
 
@@ -173,6 +170,7 @@ ctx.fillRect(enemy.x-10,enemy.y-10,40,5)
 ctx.fillStyle="lime"
 ctx.fillRect(enemy.x-10,enemy.y-10,(enemy.hp/enemy.maxHp)*40,5)
 
+// COMBAT
 let d=Math.hypot(player.x-enemy.x,player.y-enemy.y)
 
 if(d<30 && !isNeutral) enemy.hp-=player.atk*0.05
@@ -202,10 +200,6 @@ let h="<h3>Weapon</h3>"
 weapons.forEach((w,i)=>{
 h+=`<button onclick="buyW(${i})">${w.name} (${w.price})</button>`
 })
-h+="<h3>Potion</h3>"
-potions.forEach((p,i)=>{
-h+=`<button onclick="buyP(${i})">${p.name} (${p.price})</button>`
-})
 h+="<button onclick='closeUI()'>Close</button>"
 shop.innerHTML=h;shop.style.display="block"
 }
@@ -218,15 +212,6 @@ player.gold-=w.price;w.owned=true
 w.equip=!w.equip;updateAtk()
 }
 openShop();save()
-}
-
-function buyP(i){
-let p=potions[i]
-if(player.gold>=p.price){
-player.gold-=p.price
-player.hp=Math.min(player.hp+p.heal,player.maxHp)
-}
-openShop()
 }
 
 // MORPH
@@ -268,4 +253,4 @@ requestAnimationFrame(loop)
 </script>
 
 </body>
-  </html>
+</html>
