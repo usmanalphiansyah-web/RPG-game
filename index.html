@@ -1,253 +1,203 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- 🔐 SECURITY -->
 <meta http-equiv="Content-Security-Policy"
-content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+content="default-src 'self' https: ws: wss:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
 
-<title>RPG PRO SECURE</title>
+<title>RPG ONLINE FINAL</title>
 
 <style>
 body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif}
-canvas{background:#111;border:2px solid cyan;margin-top:100px}
-button{margin:3px;padding:6px;background:cyan;border:none;border-radius:6px}
+canvas{background:#111;border:2px solid cyan;margin-top:100px;border-radius:10px}
+button{margin:3px;padding:8px;background:cyan;border:none;border-radius:8px}
 
-#topUI,#bottomUI{position:absolute;width:100%;background:#000a}
-#topUI{top:0}
-#bottomUI{bottom:0}
-
-.popup{
-position:absolute;top:50%;left:50%;
-transform:translate(-50%,-50%);
-background:#111;border:2px solid cyan;padding:10px;
-display:none;max-height:300px;overflow:auto;width:90%;
-}
+#top{position:absolute;top:0;width:100%;background:#000a}
+#bottom{position:absolute;bottom:0;width:100%;background:#000a}
+#dev{display:none}
 </style>
 </head>
 
 <body>
 
 <div id="menu">
-<h2>RPG PRO</h2>
+<h2>RPG ONLINE</h2>
 <button onclick="start(false)">Player</button>
 <button onclick="start(true)">Dev</button>
 </div>
 
 <div id="game" style="display:none">
 
-<div id="topUI">
-<button onclick="openShop()">Shop</button>
-<button onclick="openMorph()">Morph</button>
-<button onclick="attack()">Attack</button>
+<div id="top">
+<button onclick="attack()">⚔️</button>
 <p id="info"></p>
 </div>
 
 <canvas id="c" width="320" height="220"></canvas>
 
-<div id="bottomUI">
+<div id="bottom">
 <button id="l">⬅️</button>
 <button id="r">➡️</button>
 <button id="u">⬆️</button>
 <button id="d">⬇️</button>
+
+<div id="dev">
+<button onclick="revive()">Revive</button>
+<button onclick="heal()">Heal</button>
+<button onclick="addMoney()">+Money</button>
+<button onclick="infHP()">Inf HP</button>
 </div>
 
-<div id="shop" class="popup"></div>
-<div id="morph" class="popup"></div>
+</div>
 
 </div>
 
 <script>
 const ctx=c.getContext("2d")
 
-// 🔐 SAFE NUMBER
-function safe(n){return isNaN(n)?0:Math.max(0,n)}
+// ===== SOUND =====
+let hit=new Audio("https://actions.google.com/sounds/v1/impacts/wood_plank_flicks.ogg")
+let kill=new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg")
 
-// SAVE
-function save(){
-localStorage.setItem("save",JSON.stringify({
-gold:player.gold,kill:kill
-}))
+// ===== SPRITE =====
+let pImg=new Image(); pImg.src="player.png"
+let eImg=new Image(); eImg.src="enemy.png"
+let bImg=new Image(); bImg.src="boss.png"
+
+// ===== DATA =====
+let player={x:50,y:150,hp:100,maxHp:100,atk:5,gold:0}
+let enemy={x:250,y:150,hp:100,maxHp:100}
+let boss={x:200,y:80,hp:500,phase:1,cd:0}
+
+let move={x:0,y:0},lastHit=0,devMode=false,inf=false
+
+// ===== MULTIPLAYER =====
+let socket
+let others={}
+
+function connect(){
+socket=new WebSocket("wss://YOUR_SERVER_URL")
+
+socket.onmessage=e=>{
+others=JSON.parse(e.data)
 }
-function load(){
-try{
-let d=JSON.parse(localStorage.getItem("save"))
-if(d){
-player.gold=safe(d.gold)
-kill=safe(d.kill)
-}
-}catch{}
 }
 
-// GAME DATA
-let move={x:0,y:0},kill=0,lastHit=0,multi=1,isNeutral=false
+function send(){
+if(socket && socket.readyState===1){
+socket.send(JSON.stringify({x:player.x,y:player.y}))
+}
+}
 
-let player={x:50,y:150,hp:100,maxHp:100,atk:5,gold:100}
-let enemy={x:250,y:150,hp:80,maxHp:80}
-
-// WEAPON
-let weapons=[
-{name:"Nova Blade",p:2,price:7,owned:false,equip:false},
-{name:"Shadow Fang",p:3,price:13,owned:false,equip:false},
-{name:"Storm Cutter",p:4,price:19,owned:false,equip:false},
-{name:"Flame Saber",p:5,price:27,owned:false,equip:false},
-{name:"Void Splitter",p:6,price:31,owned:false,equip:false},
-{name:"Thunder Claw",p:7,price:37,owned:false,equip:false},
-{name:"Frost Bite",p:8,price:43,owned:false,equip:false},
-{name:"Dragon Tear",p:9,price:51,owned:false,equip:false},
-{name:"Iron Breaker",p:11,price:63,owned:false,equip:false},
-{name:"Crystal Edge",p:14,price:79,owned:false,equip:false}
-]
-
-// MORPH (20)
-let morphBaik=[
-{name:"Light Guardian",need:3,m:2},{name:"Holy Knight",need:5,m:2},
-{name:"Divine Angel",need:7,m:3},{name:"Radiant Hero",need:9,m:4},
-{name:"Sunblade Master",need:12,m:5},{name:"Heaven Striker",need:15,m:6},
-{name:"Light Emperor",need:18,m:7},{name:"Divine Overlord",need:21,m:8},
-{name:"Celestial King",need:25,m:10},{name:"Supreme Angel",need:30,m:100}
-]
-
-let morphNetral=[
-{name:"Balance Fighter",need:2,m:2},{name:"Dual Striker",need:4,m:2},
-{name:"Gray Assassin",need:6,m:3},{name:"Neutral Blade",need:8,m:4},
-{name:"Core Warrior",need:10,m:5},{name:"Equinox Knight",need:13,m:6},
-{name:"Zen Fighter",need:16,m:7},{name:"Balance King",need:20,m:8},
-{name:"Perfect Balance",need:24,m:10},{name:"Absolute Core",need:28,m:100}
-]
-
-// START
+// ===== START =====
 function start(dev){
+if(dev){
+let p=prompt("Dev Password:")
+if(p!=="M45KED7") return
+devMode=true
+document.getElementById("dev").style.display="block"
+}
+
 menu.style.display="none"
 game.style.display="block"
 
-load()
+connect()
 
 hold(l,-2,0);hold(r,2,0);hold(u,0,-2);hold(d,0,2)
+
 loop()
 }
 
-// CONTROL HOLD
+// ===== CONTROL =====
 function hold(b,x,y){
 b.onmousedown=b.ontouchstart=()=>move={x,y}
 b.onmouseup=b.ontouchend=()=>move={x:0,y:0}
 }
 
-// DAMAGE
-function updateAtk(){
-player.atk=5
-weapons.forEach(w=>{if(w.equip)player.atk+=w.p})
+// ===== ATTACK =====
+function attack(){
+let d=Math.hypot(player.x-enemy.x,player.y-enemy.y)
+if(d<40){
+enemy.hp-=player.atk
+hit.play()
+}
 }
 
-// DRAW
+// ===== BOSS AI =====
+function bossAI(){
+boss.x+=(player.x-boss.x)*0.01
+boss.y+=(player.y-boss.y)*0.01
+
+if(boss.hp<350) boss.phase=2
+if(boss.hp<150) boss.phase=3
+
+if(Date.now()>boss.cd){
+if(!inf){
+player.hp-=boss.phase*3
+}
+boss.cd=Date.now()+2000
+}
+
+ctx.drawImage(bImg,boss.x,boss.y,30,30)
+}
+
+// ===== DRAW =====
 function draw(){
 ctx.clearRect(0,0,320,220)
 
+// player move
 player.x+=move.x
 player.y+=move.y
 
-player.x=Math.max(10,Math.min(player.x,290))
-player.y=Math.max(10,Math.min(player.y,180))
+// draw player
+ctx.drawImage(pImg,player.x,player.y,20,20)
 
-if(!isNeutral){
+// enemy follow
 enemy.x+=(player.x-enemy.x)*0.02
 enemy.y+=(player.y-enemy.y)*0.02
-}
 
-// PLAYER
-ctx.fillStyle="cyan"
-ctx.fillRect(player.x,player.y,20,20)
+ctx.drawImage(eImg,enemy.x,enemy.y,20,20)
 
-// ENEMY
-ctx.fillStyle="red"
-ctx.fillRect(enemy.x,enemy.y,20,20)
-
-// HP BAR
-ctx.fillStyle="gray"
-ctx.fillRect(enemy.x-10,enemy.y-10,40,5)
-ctx.fillStyle="lime"
-ctx.fillRect(enemy.x-10,enemy.y-10,(enemy.hp/enemy.maxHp)*40,5)
-
-// COMBAT
+// damage
 let d=Math.hypot(player.x-enemy.x,player.y-enemy.y)
 
-if(d<30 && !isNeutral) enemy.hp-=player.atk*0.05
-
-if(d<30 && Date.now()-lastHit>6000 && !isNeutral){
-player.hp-=7
+if(d<30 && Date.now()-lastHit>2000){
+if(!inf) player.hp-=5
 lastHit=Date.now()
 }
 
+// kill
 if(enemy.hp<=0){
-kill++
-player.gold+=Math.floor(17*multi)
+player.gold+=20
 enemy.hp=enemy.maxHp
-save()
-}
-}
-
-// ATTACK
-function attack(){
-let d=Math.hypot(player.x-enemy.x,player.y-enemy.y)
-if(d<40 && !isNeutral) enemy.hp-=player.atk
+kill.play()
 }
 
-// SHOP
-function openShop(){
-let h="<h3>Weapon</h3>"
-weapons.forEach((w,i)=>{
-h+=`<button onclick="buyW(${i})">${w.name} (${w.price})</button>`
-})
-h+="<button onclick='closeUI()'>Close</button>"
-shop.innerHTML=h;shop.style.display="block"
-}
+// boss
+bossAI()
 
-function buyW(i){
-let w=weapons[i]
-if(!w.owned && player.gold>=w.price){
-player.gold-=w.price;w.owned=true
-}else if(w.owned){
-w.equip=!w.equip;updateAtk()
-}
-openShop();save()
-}
-
-// MORPH
-function openMorph(){
-let h="<h3>Morph Baik</h3>"
-morphBaik.forEach((m,i)=>{
-h+=`<button onclick="useM('b',${i})">${m.name} Kill:${m.need}</button>`
-})
-h+="<h3>Morph Netral</h3>"
-morphNetral.forEach((m,i)=>{
-h+=`<button onclick="useM('n',${i})">${m.name} Kill:${m.need}</button>`
-})
-h+="<button onclick='closeUI()'>Close</button>"
-morph.innerHTML=h;morph.style.display="block"
-}
-
-function useM(t,i){
-let m=t=="b"?morphBaik[i]:morphNetral[i]
-if(kill>=m.need){
-multi=m.m
-isNeutral=(t=="n")
-player.maxHp=(m.m>=100?100:2)*100
-player.hp=player.maxHp
-}
+// multiplayer draw
+send()
+for(let id in others){
+let p=others[id]
+ctx.fillStyle="yellow"
+ctx.fillRect(p.x,p.y,20,20)
 }
 
 // UI
-function closeUI(){
-shop.style.display="none"
-morph.style.display="none"
+info.innerText="HP:"+player.hp+" GOLD:"+player.gold+" BOSS PH:"+boss.phase
 }
 
-// LOOP
+// ===== DEV =====
+function revive(){if(devMode) player.hp=player.maxHp}
+function heal(){if(devMode) player.hp=player.maxHp}
+function addMoney(){if(devMode) player.gold+=999999}
+function infHP(){if(devMode) inf=!inf}
+
+// ===== LOOP =====
 function loop(){
 draw()
-info.innerText=`HP:${player.hp}/${player.maxHp} | Gold:${player.gold} | Kill:${kill} | x${multi}`
 requestAnimationFrame(loop)
 }
 </script>
