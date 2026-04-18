@@ -3,68 +3,126 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <meta http-equiv="Content-Security-Policy"
 content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
-
 <title>RPG PRO FINAL</title>
-
 <style>
-body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif}
-canvas{background:#111;border:2px solid cyan;margin-top:110px;border-radius:10px}
-button{margin:3px;padding:6px 10px;background:cyan;border:none;border-radius:6px;color:#000;font-weight:bold}
-
-#topUI{position:absolute;top:0;width:100%;background:#000a;z-index:5}
-#bottomUI{position:absolute;bottom:0;width:100%;background:#000a;z-index:5}
-
-.popup{
-position:absolute;top:50%;left:50%;
-transform:translate(-50%,-50%);
-background:#111;border:2px solid cyan;padding:10px;
-display:none;max-height:300px;overflow:auto;width:90%;
-z-index:20;border-radius:12px;text-align:left;
-}
-
-#devPanel{margin-top:5px}
+  body{
+    margin:0;
+    background:#000;
+    color:#fff;
+    font-family:sans-serif;
+    text-align:center;
+    overflow:hidden;
+  }
+  #menu{
+    margin-top:90px;
+  }
+  #game{
+    display:none;
+  }
+  #topUI{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    background:#000a;
+    z-index:5;
+    padding:6px 0;
+  }
+  #bottomUI{
+    position:absolute;
+    bottom:0;
+    left:0;
+    width:100%;
+    background:#000a;
+    z-index:5;
+    padding:6px 0;
+  }
+  canvas{
+    background:#111;
+    border:2px solid cyan;
+    border-radius:10px;
+    margin-top:105px;
+  }
+  button{
+    margin:3px;
+    padding:7px 10px;
+    border:none;
+    border-radius:7px;
+    background:cyan;
+    color:#000;
+    font-weight:bold;
+  }
+  .popup{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    background:#111;
+    border:2px solid cyan;
+    padding:10px;
+    width:min(90vw,420px);
+    max-height:320px;
+    overflow:auto;
+    border-radius:12px;
+    display:none;
+    z-index:20;
+    text-align:left;
+  }
+  .popup h3{
+    margin:6px 0;
+    text-align:center;
+  }
+  .popup button{
+    width:100%;
+    margin:4px 0;
+  }
+  #devPanel{
+    display:none;
+    margin-top:6px;
+  }
+  #info{
+    margin:6px 0 0;
+    font-size:14px;
+    line-height:1.4;
+  }
 </style>
 </head>
-
 <body>
 
 <div id="menu">
-<h2>RPG PRO</h2>
-<button onclick="start(false)">Player</button>
-<button onclick="start(true)">Dev</button>
+  <h2>RPG PRO FINAL</h2>
+  <button onclick="start(false)">Player Mode</button>
+  <button onclick="start(true)">Dev Mode</button>
 </div>
 
-<div id="game" style="display:none">
+<div id="game">
+  <div id="topUI">
+    <button onclick="openShop()">Shop</button>
+    <button onclick="openMorph()">Morph</button>
+    <button onclick="attack()">Attack</button>
+    <p id="info"></p>
+  </div>
 
-<div id="topUI">
-<button onclick="openShop()">Shop</button>
-<button onclick="openMorph()">Morph</button>
-<button onclick="attack()">Attack</button>
-<p id="info"></p>
-</div>
+  <canvas id="c" width="320" height="220"></canvas>
 
-<canvas id="c" width="320" height="220"></canvas>
+  <div id="bottomUI">
+    <button id="l">⬅️</button>
+    <button id="r">➡️</button>
+    <button id="u">⬆️</button>
+    <button id="d">⬇️</button>
 
-<div id="bottomUI">
-<button id="l">⬅️</button>
-<button id="r">➡️</button>
-<button id="u">⬆️</button>
-<button id="d">⬇️</button>
+    <div id="devPanel">
+      <button onclick="revive()">Revive</button>
+      <button onclick="heal()">Heal</button>
+      <button onclick="addMoney()">+Money</button>
+      <button onclick="toggleInf()">Inf HP</button>
+    </div>
+  </div>
 
-<div id="devPanel" style="display:none">
-<button onclick="revive()">Revive</button>
-<button onclick="heal()">Heal</button>
-<button onclick="addMoney()">+Money</button>
-<button onclick="toggleInf()">Inf HP</button>
-</div>
-</div>
-
-<div id="shop" class="popup"></div>
-<div id="morph" class="popup"></div>
-
+  <div id="shop" class="popup"></div>
+  <div id="morph" class="popup"></div>
 </div>
 
 <script>
@@ -72,16 +130,42 @@ const ctx = document.getElementById("c").getContext("2d");
 
 function safe(n){ return isNaN(n) ? 0 : Math.max(0, n); }
 
-let move = {x:0,y:0};
-let kill = 0;
+let mode = "player";
+let devMode = false;
+let infHPState = false;
+let move = {x:0, y:0};
 let lastHit = 0;
+let kill = 0;
 let multi = 1;
 let isNeutral = false;
-let infHPState = false;
-let devMode = false;
+let bossTimer = 0;
 
-let player = {x:50,y:150,hp:100,maxHp:100,atk:5,gold:100};
-let enemy  = {x:250,y:150,hp:80,maxHp:80};
+let player = {
+  x: 50,
+  y: 150,
+  hp: 100,
+  maxHp: 100,
+  atk: 5,
+  gold: 100
+};
+
+let monster = {
+  x: 250,
+  y: 150,
+  hp: 80,
+  maxHp: 80,
+  speed: 0.7
+};
+
+let boss = {
+  x: 210,
+  y: 70,
+  hp: 220,
+  maxHp: 220,
+  phase: 1,
+  active: false,
+  cd: 0
+};
 
 function save(){
   localStorage.setItem("save", JSON.stringify({
@@ -92,64 +176,64 @@ function save(){
 
 function load(){
   try{
-    const d = JSON.parse(localStorage.getItem("save"));
-    if(d){
-      player.gold = safe(d.gold);
-      kill = safe(d.kill);
+    const data = JSON.parse(localStorage.getItem("save"));
+    if(data){
+      player.gold = safe(data.gold);
+      kill = safe(data.kill);
     }
   }catch(e){}
 }
 
-let weapons = [
-  {name:"Nova Blade",p:2,price:7,owned:false,equip:false},
-  {name:"Shadow Fang",p:3,price:13,owned:false,equip:false},
-  {name:"Storm Cutter",p:4,price:19,owned:false,equip:false},
-  {name:"Flame Saber",p:5,price:27,owned:false,equip:false},
-  {name:"Void Splitter",p:6,price:31,owned:false,equip:false},
-  {name:"Thunder Claw",p:7,price:37,owned:false,equip:false},
-  {name:"Frost Bite",p:8,price:43,owned:false,equip:false},
-  {name:"Dragon Tear",p:9,price:51,owned:false,equip:false},
-  {name:"Iron Breaker",p:11,price:63,owned:false,equip:false},
-  {name:"Crystal Edge",p:14,price:79,owned:false,equip:false}
+const weapons = [
+  {name:"Nova Blade", p:2, price:7, owned:false, equip:false},
+  {name:"Shadow Fang", p:3, price:13, owned:false, equip:false},
+  {name:"Storm Cutter", p:4, price:19, owned:false, equip:false},
+  {name:"Flame Saber", p:5, price:27, owned:false, equip:false},
+  {name:"Void Splitter", p:6, price:31, owned:false, equip:false},
+  {name:"Thunder Claw", p:7, price:37, owned:false, equip:false},
+  {name:"Frost Bite", p:8, price:43, owned:false, equip:false},
+  {name:"Dragon Tear", p:9, price:51, owned:false, equip:false},
+  {name:"Iron Breaker", p:11, price:63, owned:false, equip:false},
+  {name:"Crystal Edge", p:14, price:79, owned:false, equip:false}
 ];
 
-let potions = [
-  {name:"Tiny Heal",heal:11,price:5},
-  {name:"Small Heal",heal:17,price:9},
-  {name:"Mild Heal",heal:23,price:13},
-  {name:"Fresh Heal",heal:29,price:17},
-  {name:"Strong Heal",heal:37,price:23},
-  {name:"Great Heal",heal:43,price:27},
-  {name:"Mega Heal",heal:51,price:31},
-  {name:"Ultra Heal",heal:59,price:37},
-  {name:"Max Heal",heal:67,price:43},
-  {name:"Legend Heal",heal:79,price:53}
+const potions = [
+  {name:"Tiny Heal", heal:11, price:5},
+  {name:"Small Heal", heal:17, price:9},
+  {name:"Mild Heal", heal:23, price:13},
+  {name:"Fresh Heal", heal:29, price:17},
+  {name:"Strong Heal", heal:37, price:23},
+  {name:"Great Heal", heal:43, price:27},
+  {name:"Mega Heal", heal:51, price:31},
+  {name:"Ultra Heal", heal:59, price:37},
+  {name:"Max Heal", heal:67, price:43},
+  {name:"Legend Heal", heal:79, price:53}
 ];
 
-let morphBaik = [
-  {name:"Light Guardian",need:3,m:2},
-  {name:"Holy Knight",need:5,m:2},
-  {name:"Divine Angel",need:7,m:3},
-  {name:"Radiant Hero",need:9,m:4},
-  {name:"Sunblade Master",need:12,m:5},
-  {name:"Heaven Striker",need:15,m:6},
-  {name:"Light Emperor",need:18,m:7},
-  {name:"Divine Overlord",need:21,m:8},
-  {name:"Celestial King",need:25,m:10},
-  {name:"Supreme Angel",need:30,m:100}
+const morphBaik = [
+  {name:"Light Guardian", need:3, m:2},
+  {name:"Holy Knight", need:5, m:2},
+  {name:"Divine Angel", need:7, m:3},
+  {name:"Radiant Hero", need:9, m:4},
+  {name:"Sunblade Master", need:12, m:5},
+  {name:"Heaven Striker", need:15, m:6},
+  {name:"Light Emperor", need:18, m:7},
+  {name:"Divine Overlord", need:21, m:8},
+  {name:"Celestial King", need:25, m:10},
+  {name:"Supreme Angel", need:30, m:100}
 ];
 
-let morphNetral = [
-  {name:"Balance Fighter",need:2,m:2},
-  {name:"Dual Striker",need:4,m:2},
-  {name:"Gray Assassin",need:6,m:3},
-  {name:"Neutral Blade",need:8,m:4},
-  {name:"Core Warrior",need:10,m:5},
-  {name:"Equinox Knight",need:13,m:6},
-  {name:"Zen Fighter",need:16,m:7},
-  {name:"Balance King",need:20,m:8},
-  {name:"Perfect Balance",need:24,m:10},
-  {name:"Absolute Core",need:28,m:100}
+const morphNetral = [
+  {name:"Balance Fighter", need:2, m:2},
+  {name:"Dual Striker", need:4, m:2},
+  {name:"Gray Assassin", need:6, m:3},
+  {name:"Neutral Blade", need:8, m:4},
+  {name:"Core Warrior", need:10, m:5},
+  {name:"Equinox Knight", need:13, m:6},
+  {name:"Zen Fighter", need:16, m:7},
+  {name:"Balance King", need:20, m:8},
+  {name:"Perfect Balance", need:24, m:10},
+  {name:"Absolute Core", need:28, m:100}
 ];
 
 function updateAtk(){
@@ -159,7 +243,7 @@ function updateAtk(){
   });
 }
 
-function hold(btn,dx,dy){
+function hold(btn, dx, dy){
   btn.onmousedown = btn.ontouchstart = () => move = {x:dx, y:dy};
   btn.onmouseup = btn.ontouchend = () => move = {x:0, y:0};
 }
@@ -170,7 +254,7 @@ function start(dev){
   const devEl = document.getElementById("devPanel");
 
   if(dev){
-    let p = prompt("Password Dev:");
+    const p = prompt("Password Dev:");
     if(!p || p.trim().toUpperCase() !== "M45KED7"){
       alert("Denied");
       return;
@@ -182,6 +266,7 @@ function start(dev){
     devEl.style.display = "none";
   }
 
+  mode = dev ? "dev" : "player";
   menuEl.style.display = "none";
   gameEl.style.display = "block";
 
@@ -200,41 +285,81 @@ function draw(){
 
   player.x += move.x;
   player.y += move.y;
-
   player.x = Math.max(10, Math.min(player.x, 290));
   player.y = Math.max(10, Math.min(player.y, 180));
 
   if(!isNeutral){
-    enemy.x += (player.x - enemy.x) * 0.02;
-    enemy.y += (player.y - enemy.y) * 0.02;
+    monster.x += (player.x - monster.x) * 0.02;
+    monster.y += (player.y - monster.y) * 0.02;
   }
+
+  if(!boss.active && kill >= 5){
+    boss.active = true;
+  }
+
+  if(boss.active && !isNeutral){
+    boss.x += (player.x - boss.x) * 0.01;
+    boss.y += (player.y - boss.y) * 0.01;
+
+    if(boss.hp < 150) boss.phase = 2;
+    if(boss.hp < 80) boss.phase = 3;
+
+    if(Date.now() > boss.cd){
+      if(!infHPState) player.hp -= boss.phase * 4;
+      boss.cd = Date.now() + 2000;
+    }
+  }
+
+  ctx.strokeStyle = "cyan";
+  ctx.strokeRect(10,10,300,200);
 
   ctx.fillStyle = "cyan";
-  ctx.fillRect(player.x,player.y,20,20);
+  ctx.fillRect(player.x, player.y, 20, 20);
 
   ctx.fillStyle = "red";
-  ctx.fillRect(enemy.x,enemy.y,20,20);
+  ctx.fillRect(monster.x, monster.y, 20, 20);
 
-  ctx.fillStyle = "gray";
-  ctx.fillRect(enemy.x-10,enemy.y-10,40,5);
-  ctx.fillStyle = "lime";
-  ctx.fillRect(enemy.x-10,enemy.y-10,(enemy.hp/enemy.maxHp)*40,5);
-
-  let d = Math.hypot(player.x-enemy.x, player.y-enemy.y);
-
-  if(d < 30 && !isNeutral){
-    enemy.hp -= player.atk * 0.05;
+  ctx.fillStyle = "purple";
+  if(boss.active){
+    ctx.fillRect(boss.x, boss.y, 30, 30);
   }
 
-  if(d < 30 && Date.now() - lastHit > 6000 && !isNeutral){
+  ctx.fillStyle = "gray";
+  ctx.fillRect(monster.x-10, monster.y-10, 40, 5);
+  ctx.fillStyle = "lime";
+  ctx.fillRect(monster.x-10, monster.y-10, (monster.hp / monster.maxHp) * 40, 5);
+
+  if(boss.active){
+    ctx.fillStyle = "gray";
+    ctx.fillRect(boss.x-10, boss.y-10, 50, 5);
+    ctx.fillStyle = "orange";
+    ctx.fillRect(boss.x-10, boss.y-10, (boss.hp / boss.maxHp) * 50, 5);
+  }
+
+  const d1 = Math.hypot(player.x - monster.x, player.y - monster.y);
+
+  if(d1 < 30 && !isNeutral){
+    monster.hp -= player.atk * 0.05;
+  }
+
+  if(d1 < 30 && Date.now() - lastHit > 6000 && !isNeutral){
     if(!infHPState) player.hp -= 7;
     lastHit = Date.now();
   }
 
-  if(enemy.hp <= 0){
+  if(monster.hp <= 0){
     kill++;
     player.gold += Math.floor(17 * multi);
-    enemy.hp = enemy.maxHp;
+    monster.hp = monster.maxHp;
+    save();
+  }
+
+  if(boss.active && boss.hp <= 0){
+    kill += 3;
+    player.gold += Math.floor(50 * multi);
+    boss.hp = boss.maxHp;
+    boss.phase = 1;
+    boss.active = false;
     save();
   }
 
@@ -245,9 +370,16 @@ function draw(){
 }
 
 function attack(){
-  let d = Math.hypot(player.x-enemy.x, player.y-enemy.y);
-  if(d < 40 && !isNeutral){
-    enemy.hp -= player.atk;
+  const d1 = Math.hypot(player.x - monster.x, player.y - monster.y);
+  if(d1 < 40 && !isNeutral){
+    monster.hp -= player.atk;
+  }
+
+  if(boss.active){
+    const d2 = Math.hypot(player.x - boss.x, player.y - boss.y);
+    if(d2 < 48 && !isNeutral){
+      boss.hp -= player.atk * 1.2;
+    }
   }
 }
 
@@ -263,13 +395,14 @@ function openShop(){
   });
 
   h += "<button onclick='closeUI()'>Close</button>";
-  document.getElementById("shop").innerHTML = h;
-  document.getElementById("shop").style.display = "block";
+  const shopEl = document.getElementById("shop");
+  shopEl.innerHTML = h;
+  shopEl.style.display = "block";
   document.getElementById("morph").style.display = "none";
 }
 
 function buyW(i){
-  let w = weapons[i];
+  const w = weapons[i];
   if(!w.owned && player.gold >= w.price){
     player.gold -= w.price;
     w.owned = true;
@@ -282,7 +415,7 @@ function buyW(i){
 }
 
 function buyP(i){
-  let p = potions[i];
+  const p = potions[i];
   if(player.gold >= p.price){
     player.gold -= p.price;
     player.hp = Math.min(player.hp + p.heal, player.maxHp);
@@ -303,13 +436,14 @@ function openMorph(){
   });
 
   h += "<button onclick='closeUI()'>Close</button>";
-  document.getElementById("morph").innerHTML = h;
-  document.getElementById("morph").style.display = "block";
+  const morphEl = document.getElementById("morph");
+  morphEl.innerHTML = h;
+  morphEl.style.display = "block";
   document.getElementById("shop").style.display = "none";
 }
 
 function useM(t,i){
-  let m = t === "b" ? morphBaik[i] : morphNetral[i];
+  const m = t === "b" ? morphBaik[i] : morphNetral[i];
   if(kill >= m.need){
     multi = m.m;
     isNeutral = (t === "n");
@@ -331,7 +465,10 @@ function toggleInf(){ if(devMode) infHPState = !infHPState; }
 function loop(){
   draw();
   document.getElementById("info").innerText =
-    `HP:${player.hp}/${player.maxHp} | Gold:${player.gold} | Kill:${kill} | x${multi}` + (isNeutral ? " | NETRAL" : "");
+    `Mode: ${mode.toUpperCase()} | HP: ${player.hp}/${player.maxHp} | Gold: ${player.gold} | Kill: ${kill} | x${multi}` +
+    (isNeutral ? " | NETRAL" : "") +
+    (boss.active ? ` | BOSS Phase ${boss.phase}` : "");
+
   requestAnimationFrame(loop);
 }
 </script>
