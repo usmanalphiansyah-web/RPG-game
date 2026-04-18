@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- SECURITY -->
+<meta http-equiv="Content-Security-Policy"
+content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+
+<title>RPG PRO FINAL</title>
+
+<style>
+body{margin:0;background:#000;color:#fff;text-align:center;font-family:sans-serif}
+canvas{background:#111;border:2px solid cyan;margin-top:100px}
+button{margin:3px;padding:6px;background:cyan;border:none;border-radius:6px}
+
+#topUI,#bottomUI{position:absolute;width:100%;background:#000a}
+#topUI{top:0}
+#bottomUI{bottom:0}
+
+.popup{
+position:absolute;top:50%;left:50%;
+transform:translate(-50%,-50%);
+background:#111;border:2px solid cyan;padding:10px;
+display:none;max-height:300px;overflow:auto;width:90%;
+}
+</style>
+</head>
+
+<body>
+
+<div id="menu">
+<h2>RPG PRO</h2>
+<button onclick="start()">Start Game</button>
+</div>
+
+<div id="game" style="display:none">
+
+<div id="topUI">
+<button onclick="openShop()">Shop</button>
+<button onclick="openMorph()">Morph</button>
+<button onclick="attack()">Attack</button>
+<p id="info"></p>
+</div>
+
+<canvas id="c" width="320" height="220"></canvas>
+
+<div id="bottomUI">
+<button id="l">⬅️</button>
+<button id="r">➡️</button>
+<button id="u">⬆️</button>
+<button id="d">⬇️</button>
+</div>
+
+<div id="shop" class="popup"></div>
+<div id="morph" class="popup"></div>
+
+</div>
+
+<script>
+const ctx=c.getContext("2d")
+
+function safe(n){return isNaN(n)?0:Math.max(0,n)}
+
+let move={x:0,y:0},kill=0,lastHit=0,multi=1,isNeutral=false
+
+let player={x:50,y:150,hp:100,maxHp:100,atk:5,gold:100}
+let enemy={x:250,y:150,hp:80,maxHp:80}
+
+// SAVE
+function save(){
+localStorage.setItem("save",JSON.stringify({gold:player.gold,kill:kill}))
+}
+function load(){
+try{
+let d=JSON.parse(localStorage.getItem("save"))
+if(d){
+player.gold=safe(d.gold)
+kill=safe(d.kill)
+}
+}catch{}
+}
+
+// START
+function start(){
+menu.style.display="none"
+game.style.display="block"
+load()
+hold(l,-2,0);hold(r,2,0);hold(u,0,-2);hold(d,0,2)
+loop()
+}
+
+function hold(b,x,y){
+b.onmousedown=b.ontouchstart=()=>move={x,y}
+b.onmouseup=b.ontouchend=()=>move={x:0,y:0}
+}
+
+// WEAPON
+let weapons=[
+{name:"Nova Blade",p:2,price:7,owned:false,equip:false},
+{name:"Shadow Fang",p:3,price:13,owned:false,equip:false},
+{name:"Storm Cutter",p:4,price:19,owned:false,equip:false},
+{name:"Flame Saber",p:5,price:27,owned:false,equip:false},
+{name:"Void Splitter",p:6,price:31,owned:false,equip:false},
+{name:"Thunder Claw",p:7,price:37,owned:false,equip:false},
+{name:"Frost Bite",p:8,price:43,owned:false,equip:false},
+{name:"Dragon Tear",p:9,price:51,owned:false,equip:false},
+{name:"Iron Breaker",p:11,price:63,owned:false,equip:false},
+{name:"Crystal Edge",p:14,price:79,owned:false,equip:false}
+]
+
+// POTION
+let potions=[
+{name:"Tiny Heal",heal:11,price:5},
+{name:"Small Heal",heal:17,price:9},
+{name:"Mild Heal",heal:23,price:13},
+{name:"Fresh Heal",heal:29,price:17},
+{name:"Strong Heal",heal:37,price:23},
+{name:"Great Heal",heal:43,price:27},
+{name:"Mega Heal",heal:51,price:31},
+{name:"Ultra Heal",heal:59,price:37},
+{name:"Max Heal",heal:67,price:43},
+{name:"Legend Heal",heal:79,price:53}
+]
+
+// MORPH
+let morphBaik=[
+{name:"Light Guardian",need:3,m:2},{name:"Holy Knight",need:5,m:2},
+{name:"Divine Angel",need:7,m:3},{name:"Radiant Hero",need:9,m:4},
+{name:"Sunblade Master",need:12,m:5},{name:"Heaven Striker",need:15,m:6},
+{name:"Light Emperor",need:18,m:7},{name:"Divine Overlord",need:21,m:8},
+{name:"Celestial King",need:25,m:10},{name:"Supreme Angel",need:30,m:100}
+]
+
+let morphNetral=[
+{name:"Balance Fighter",need:2,m:2},{name:"Dual Striker",need:4,m:2},
+{name:"Gray Assassin",need:6,m:3},{name:"Neutral Blade",need:8,m:4},
+{name:"Core Warrior",need:10,m:5},{name:"Equinox Knight",need:13,m:6},
+{name:"Zen Fighter",need:16,m:7},{name:"Balance King",need:20,m:8},
+{name:"Perfect Balance",need:24,m:10},{name:"Absolute Core",need:28,m:100}
+]
+
+// DAMAGE
+function updateAtk(){
+player.atk=5
+weapons.forEach(w=>{if(w.equip)player.atk+=w.p})
+}
+
+// DRAW
+function draw(){
+ctx.clearRect(0,0,320,220)
+
+player.x+=move.x
+player.y+=move.y
+player.x=Math.max(10,Math.min(player.x,290))
+player.y=Math.max(10,Math.min(player.y,180))
+
+if(!isNeutral){
+enemy.x+=(player.x-enemy.x)*0.02
+enemy.y+=(player.y-enemy.y)*0.02
+}
+
+ctx.fillStyle="cyan"
+ctx.fillRect(player.x,player.y,20,20)
+
+ctx.fillStyle="red"
+ctx.fillRect(enemy.x,enemy.y,20,20)
+
+// HP BAR
+ctx.fillStyle="gray"
+ctx.fillRect(enemy.x-10,enemy.y-10,40,5)
+ctx.fillStyle="lime"
+ctx.fillRect(enemy.x-10,enemy.y-10,(enemy.hp/enemy.maxHp)*40,5)
+
+let d=Math.hypot(player.x-enemy.x,player.y-enemy.y)
+
+if(d<30 && !isNeutral) enemy.hp-=player.atk*0.05
+
+if(d<30 && Date.now()-lastHit>6000 && !isNeutral){
+player.hp-=7
+lastHit=Date.now()
+}
+
+if(enemy.hp<=0){
+kill++
+player.gold+=Math.floor(17*multi)
+enemy.hp=enemy.maxHp
+save()
+}
+}
+
+// ATTACK
+function attack(){
+let d=Math.hypot(player.x-enemy.x,player.y-enemy.y)
+if(d<40 && !isNeutral) enemy.hp-=player.atk
+}
+
+// SHOP
+function openShop(){
+let h="<h3>Weapon</h3>"
+weapons.forEach((w,i)=>{
+h+=`<button onclick="buyW(${i})">${w.name} (${w.price})</button>`
+})
+h+="<h3>Potion</h3>"
+potions.forEach((p,i)=>{
+h+=`<button onclick="buyP(${i})">${p.name} (${p.price})</button>`
+})
+h+="<button onclick='closeUI()'>Close</button>"
+shop.innerHTML=h;shop.style.display="block"
+}
+
+function buyW(i){
+let w=weapons[i]
+if(!w.owned && player.gold>=w.price){
+player.gold-=w.price;w.owned=true
+}else if(w.owned){
+w.equip=!w.equip;updateAtk()
+}
+openShop();save()
+}
+
+function buyP(i){
+let p=potions[i]
+if(player.gold>=p.price){
+player.gold-=p.price
+player.hp=Math.min(player.hp+p.heal,player.maxHp)
+}
+openShop()
+}
+
+// MORPH
+function openMorph(){
+let h="<h3>Morph Baik</h3>"
+morphBaik.forEach((m,i)=>{
+h+=`<button onclick="useM('b',${i})">${m.name} Kill:${m.need}</button>`
+})
+h+="<h3>Morph Netral</h3>"
+morphNetral.forEach((m,i)=>{
+h+=`<button onclick="useM('n',${i})">${m.name} Kill:${m.need}</button>`
+})
+h+="<button onclick='closeUI()'>Close</button>"
+morph.innerHTML=h;morph.style.display="block"
+}
+
+function useM(t,i){
+let m=t=="b"?morphBaik[i]:morphNetral[i]
+if(kill>=m.need){
+multi=m.m
+isNeutral=(t=="n")
+player.maxHp=(m.m>=100?100:2)*100
+player.hp=player.maxHp
+}
+}
+
+// UI
+function closeUI(){
+shop.style.display="none"
+morph.style.display="none"
+}
+
+// LOOP
+function loop(){
+draw()
+info.innerText=`HP:${player.hp}/${player.maxHp} | Gold:${player.gold} | Kill:${kill} | x${multi}`
+requestAnimationFrame(loop)
+}
+</script>
+
+</body>
+  </html>
